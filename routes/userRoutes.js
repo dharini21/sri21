@@ -13,6 +13,6 @@ router.get('/getAll/doctor', getAllDoctor)
 router.put('/update/user/:id', authorize, authenticateRole([Enum.ROLES.USER, Enum.ROLES.ADMIN]), updateUser)
 router.delete('/delete/user/:id', authorize, authenticateRole([Enum.ROLES.USER, Enum.ROLES.ADMIN]), deleteUser)
 router.post('/makeAppointment/user', authorize, authenticateRole([Enum.ROLES.USER, Enum.ROLES.ADMIN]), makeAppointment)
-router.put('/cancelAppointment/:appointmentId', cancelAppointment)
+router.put('/cancelAppointment/:appointmentId', authorize, authenticateRole([Enum.ROLES.USER, Enum.ROLES.ADMIN]),cancelAppointment)
 router.post('/ratingDoctor/:appointmentId',authorize, authenticateRole([Enum.ROLES.USER]),ratingDoctor)
 module.exports = router;

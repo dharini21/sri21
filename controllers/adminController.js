@@ -1,9 +1,11 @@
 const bcrypt = require("bcrypt");
 const Admin = require("./../models/admin.js");
+const User = require("./../models/user.js")
 const config = require("./../config/config.js");
+const {sendWelcomeEmail}=require("./../email/sendemail.js")
 const jwt = require("jsonwebtoken");
 
-async function createAdmin(req, res) {
+const createAdmin = async (req, res) => {
   try {
     const { name, email, phoneNo, password, address } = req.body;
 
@@ -29,7 +31,7 @@ async function createAdmin(req, res) {
   }
 }
 
-async function loginAdmin(req, res) {
+const loginAdmin = async (req, res) => {
   try {
     const { email, phoneNo, password } = req.body;
     const admin = await Admin.findOne({ $or: [{ email }, { phoneNo }] });
@@ -47,7 +49,8 @@ async function loginAdmin(req, res) {
   }
 }
 
-async function getAdmin(req, res) {
+
+const getAdmin = async (req, res) => {
   try {
     const adminId = req.params.id;
     const admin = await Admin.findById(adminId);
@@ -59,13 +62,13 @@ async function getAdmin(req, res) {
   }
 }
 
-async function updateAdmin(req, res) {
+const updateAdmin = async (req, res) => {
   try {
     const adminId = req.params.id;
-    const {name,email,phoneNo,password}=req.body;
+    const { name, email, phoneNo, password,address} = req.body;
     const admin = await Admin.findById(adminId);
     if (!admin) return res.status(404).send("admin not found");
-    
+
     const updateadmin = {
       name,
       email,
@@ -78,14 +81,14 @@ async function updateAdmin(req, res) {
       const hashedPassword = await bcrypt.hash(password, salt);
       updateadmin.password = hashedPassword;
     }
-    const result = await Admin.findByIdAndUpdate(adminId, updateadmin,{new:true});
+    const result = await Admin.findByIdAndUpdate(adminId, updateadmin, { new: true });
     if (result) return res.status(200).json(result);
   } catch (error) {
     console.error(error);
   }
 }
 
-async function deleteAdmin(req, res) {
+const deleteAdmin = async (req, res) => {
   try {
     const adminId = req.params.id;
     const admin = await Admin.findById(adminId);
@@ -98,10 +101,40 @@ async function deleteAdmin(req, res) {
   }
 }
 
+
+const createUserByAdmin= async (req, res)=>{
+  try {
+    const { name, email, phoneNo, password, role } = req.body;
+
+    const ifExits = await User.findOne({ $or: [{ email }, { phoneNo }] });
+    if (ifExits) return res.status(400).json({ message: "User already Exists..." });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = new User({
+      name,
+      email,
+      phoneNo,
+      password: hashedPassword,
+      role
+    });
+    await user.save();
+    await sendWelcomeEmail(user.email, user.name, password);
+    return res
+      .status(200)
+      .json({ message: "user registration successfully", user: user });
+  } catch (error) {
+    console.error("error", error);
+  }
+}
+
+
 module.exports = {
   createAdmin,
   loginAdmin,
   getAdmin,
   updateAdmin,
   deleteAdmin,
+  createUserByAdmin
 };

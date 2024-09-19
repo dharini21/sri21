@@ -45,6 +45,5 @@ const doctorSchema = new mongoose.Schema({
       review: { type: String }
     }
   ]
-
 })
 module.exports = mongoose.model('doctor', doctorSchema)

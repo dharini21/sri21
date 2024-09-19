@@ -7,9 +7,8 @@ const config = require('./../config/config.js')
 const Rating = require('./../models/ratings.js')
 const jwt = require('jsonwebtoken')
 const { sendWelcomeEmail, sendDeleteEmail, requestEmail, cancelEmail } = require('./../email/sendemail.js');
-const appointment = require("./../models/appointment.js");
 
-async function createUser(req, res) {
+const createUser = async (req, res) => {
   try {
     const { name, email, phoneNo, password, role } = req.body;
 
@@ -36,7 +35,7 @@ async function createUser(req, res) {
   }
 }
 
-async function loginUser(req, res) {
+const loginUser = async (req, res) => {
   try {
     const { email, phoneNo, password } = req.body;
     const user = await User.findOne({ $or: [{ email }, { phoneNo }] })
@@ -52,20 +51,20 @@ async function loginUser(req, res) {
   }
 }
 
-async function getUser(req, res) {
+const getUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'user not found' });
 
-    return res.status(200).json({ message: "get successfully", user: user });
+   res.status(200).json({ message: "get successfully", user: user });
   } catch (error) {
     console.error("error", error);
   }
 }
 
 
-// async function getAllUser(req, res){
+// const getAllUser=async(req, res)=>{
 //   try {
 //     const user = await User.find();
 //     if (!user) return res.status(404).send("user not found");
@@ -76,7 +75,7 @@ async function getUser(req, res) {
 //   }
 // }
 
-async function updateUser(req, res) {
+const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const { name, email, phoneNo, password } = req.body;
@@ -102,7 +101,7 @@ async function updateUser(req, res) {
   }
 }
 
-async function deleteUser(req, res) {
+const deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const user = await User.findById(userId);
@@ -115,7 +114,7 @@ async function deleteUser(req, res) {
   }
 }
 
-async function getAllDoctor(req, res) {
+const getAllDoctor = async (req, res) => {
   try {
     const doctors = await Doctor.aggregate([
       {
@@ -136,7 +135,6 @@ async function getAllDoctor(req, res) {
           experience: 1,
           address: 1,
           availability: 1,
-          userRatings: 1, 
           averageRating: { $avg: "$userRatings.rating" }
         }
       },
@@ -149,41 +147,30 @@ async function getAllDoctor(req, res) {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
+
     res.status(200).json({ message: "Doctors retrieved successfully", doctors });
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    res.status(500).send('Internal Server Error');
   }
 }
-async function makeAppointment(req, res) {
+const makeAppointment = async (req, res) => {
   try {
     const { doctorId, patientId, day, date, time, reason } = req.body;
 
     const doctorExists = await Doctor.findById(doctorId);
-    if (!doctorExists) {
-      return res.status(404).json({ message: 'Doctor not found' });
-    }
+    if (!doctorExists) return res.status(404).json({ message: 'Doctor not found' });
 
     const patientExists = await User.findById(patientId);
-    if (!patientExists) {
-      return res.status(404).json({ message: 'Patient not found' });
-    }
-
+    if (!patientExists) return res.status(404).json({ message: 'Patient not found' });
     const availability = await Availability.findOne({ doctorId });
-    if (!availability) return res.status(404).json
+    if (!availability) return res.status(404).json({ message: "doctor availability not found" })
     const slot = availability.slots.find(
-      (slot) => slot.date.toISOString() === new Date(date).toISOString() && slot.day === day && slot.isAvailable===true
+      (slot) => slot.date.toISOString() === new Date(date).toISOString() && slot.day === day && slot.isAvailable === true
     );
 
-    if (!slot) {
-      return res.status(400).json({ error: 'No available slots on this date.' });
-    }
+    if (!slot) return res.status(400).json({ error: 'No available slots on this date.' });
 
-
-    if (!availability) {
-      return res.status(400).json({ error: 'Availability Not Found' });
-    }
-
+    if (!availability) return res.status(400).json({ error: 'Availability Not Found' });
 
     const startTime = slot.time.startTime;
     const endTime = slot.time.endTime;
@@ -196,10 +183,7 @@ async function makeAppointment(req, res) {
       (appointmentHour > startHour || (appointmentHour === startHour && appointmentMinute >= startMinute)) &&
       (appointmentHour < endHour || (appointmentHour === endHour && appointmentMinute <= endMinute));
 
-    if (!isWithinTimeRange) {
-      return res.status(400).json({ error: 'Selected time is not within the available time range.' });
-    }
-
+    if (!isWithinTimeRange) return res.status(400).json({ error: 'Selected time is not within the available time range.' });
     const existingAppointment = await Appointment.findOne({
       doctorId,
       day,
@@ -207,10 +191,7 @@ async function makeAppointment(req, res) {
       time
     });
 
-    if (existingAppointment) {
-      return res.status(400).json({ message: 'Doctor already booked at this time.' });
-    }
-
+    if (existingAppointment) return res.status(400).json({ message: 'Doctor already booked at this time.' });
     const newAppointment = new Appointment({
       doctorId,
       patientId,
@@ -262,31 +243,23 @@ async function makeAppointment(req, res) {
     res.status(201).json(newAppointment);
   } catch (error) {
     console.error('Error booking appointment:', error);
-    res.status(500).json({ error: 'Error booking appointment' });
   }
 }
 
 
-async function cancelAppointment(req, res) {
+const cancelAppointment = async (req, res) => {
   try {
-    const {appointmentId} = req.params;
+    const { appointmentId } = req.params;
     const { doctorId, userId } = req.body;
-   
-   const appointment=await Appointment.findById(appointmentId);
-   if(!appointment){
-    return res.status(400).json({message:"appointment not found"})
-   }
-   
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) return res.status(400).json({ message: "appointment not found" })
+
     const doctorExists = await Doctor.findById(doctorId);
-    if (!doctorExists) {
-      return res.status(404).json({ message: 'Doctor not found' });
-    }
+    if (!doctorExists) return res.status(404).json({ message: 'Doctor not found' });
 
     const userExists = await User.findById(userId);
-    if (!userExists) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
+    if (!userExists) return res.status(404).json({ message: 'User not found' });
     appointment.status = 'CANCELED';
     await Doctor.findByIdAndUpdate(
       doctorId,
@@ -305,11 +278,9 @@ async function cancelAppointment(req, res) {
       { $set: { 'slots.$.isAvailable': true } },
       { new: true }
     );
-    
 
-    if (!updatedAvailability) {
-      return res.status(404).json({ message: 'Availability slot not found or could not be updated' });
-    }
+
+    if (!updatedAvailability) return res.status(404).json({ message: 'Availability slot not found or could not be updated' });
     await appointment.save();
 
     await cancelEmail(doctorExists.email, doctorExists.name, userExists.name, appointment.day, appointment.date, appointment.time)
@@ -317,13 +288,12 @@ async function cancelAppointment(req, res) {
 
   } catch (error) {
     console.error('Error canceling appointment:', error);
-    res.status(500).json({ message: 'Internal server error' });
   }
 }
 
-async function ratingDoctor(req, res) {
+const ratingDoctor=async(req, res)=>{
   try {
-    const {userId, doctorId, rating, review } = req.body;
+    const { userId, doctorId, rating, review } = req.body;
     const { appointmentId } = req.params;
 
     const appointment = await Appointment.findById(appointmentId);
@@ -333,25 +303,17 @@ async function ratingDoctor(req, res) {
 
 
     const doctorExists = await Doctor.findById(doctorId);
-    if (!doctorExists) {
-      return res.status(404).json({ message: 'Doctor not found' });
-    }
+    if (!doctorExists) return res.status(404).json({ message: 'Doctor not found' });
 
     const userExists = await User.findById(userId);
-    if (!userExists) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
+    if (!userExists) return res.status(404).json({ message: 'User not found' });
     const appointmentIn = await Appointment.findOne({
       doctorId,
       patientId: userId,
       status: 'COMPLETED'
     });
 
-    if (!appointmentIn) {
-      return res.status(400).json({ error: 'You can only rate after the appointment is completed.' });
-    }
-
+    if (!appointmentIn) return res.status(400).json({ error: 'You can only rate after the appointment is completed.' });
     const newRating = new Rating({
       appointmentId,
       userId,
@@ -365,10 +327,7 @@ async function ratingDoctor(req, res) {
       (rating) => rating.appointmentId.toString() === appointmentId
     );
 
-    if (existingRating) {
-      return res.status(400).json({ error: 'You have already rated this doctor.' });
-    }
-
+    if (existingRating) return res.status(400).json({ error: 'You have already rated this doctor.' });
     await Doctor.findByIdAndUpdate(
       doctorId,
       { $push: { userRatings: { appointmentId: appointmentId, userId: userId, rating, review } } }

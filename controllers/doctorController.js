@@ -6,13 +6,13 @@ const Doctor = require("./../models/doctor.js")
 const User = require("./../models/user.js")
 const { updateEmail } = require('./../email/sendemail.js')
 const Appointment = require("./../models/appointment.js");
-async function createDoctor(req, res) {
+const createDoctor = async (req, res) => {
   try {
     const { name, phoneNo, email, hospitalName, specialist, experience, password, role, address } = req.body;
     const ifExits = await Doctor.findOne({ $or: [{ email }, { phoneNo }] })
-    if (ifExits) return res.status(400).send("Doctor already exits")
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+    if (ifExits) return res.status(400).json({message:'Doctor already exits'})
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const doctor = new Doctor({
       name,
@@ -21,27 +21,27 @@ async function createDoctor(req, res) {
       hospitalName,
       specialist,
       experience,
-      password:hashedPassword,
+      password: hashedPassword,
       role,
       address
 
     })
     await doctor.save();
-    return res.status(200).json({ message: "doctor registration successfully..", doctor: doctor })
+    return res.status(200).json({ message: 'doctor registration successfully..', doctor: doctor })
   } catch (error) {
     console.error(error);
   }
 }
 
 
-async function loginDoctor(req, res) {
+const loginDoctor = async (req, res) => {
   try {
     const { email, password } = req.body;
     const doctor = await Doctor.findOne({ email })
-    if (!doctor) return res.status(400).send('Bad request')
+    if (!doctor) return res.status(400).json({message:'Bad request'})
 
     const isMatch = bcrypt.compare(password, doctor.password)
-    if (!isMatch) return res.status(400).send('send invalid password')
+    if (!isMatch) return res.status(400).json({message:'send invalid password'})
 
     const token = jwt.sign({ doctor: doctor._id, role: doctor.role }, config.jwtSecret, { expiresIn: '24h' })
     res.json({ doctor, token })
@@ -51,23 +51,23 @@ async function loginDoctor(req, res) {
 }
 
 
-async function getDoctor(req, res) {
+const getDoctor = async (req, res) => {
   try {
-    const doctorID = req.params.id;
-    const doctor = await Doctor.findById(doctorID);
-    if (!doctor) return res.status(401).send("Doctor not found..")
+    const doctorId = req.params.id;
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor) return res.status(404).json({message:'Doctor not found..'})
     res.status(200).json({ message: "get successfully", doctor: doctor });
   } catch (error) {
     console.error(error);
   }
 }
 
-async function updateDoctor(req, res) {
+const updateDoctor = async (req, res) => {
   try {
     const doctorId = req.params.id;
-    const { name, specialist, phoneNo, email,address, password } = req.body;
+    const { name, specialist, phoneNo, email, address, password } = req.body;
     const doctor = await Doctor.findById(doctorId);
-    if (!doctor) return res.status(401).send("Doctor not found..")
+    if (!doctor) return res.status(404).json({message:'Doctor not found..'})
 
     const updatedDoctor = {
       name,
@@ -83,7 +83,7 @@ async function updateDoctor(req, res) {
       updatedDoctor.password = hashedPassword;
     }
 
-    const result = await Doctor.findByIdAndUpdate(doctorId, updatedDoctor, password,{ new: true })
+    const result = await Doctor.findByIdAndUpdate(doctorId, updatedDoctor, password, { new: true })
     if (result) res.status(200).json(result)
   } catch (error) {
     console.error(error);
@@ -91,21 +91,25 @@ async function updateDoctor(req, res) {
 }
 
 
-async function deleteDoctor(req, res) {
+const deleteDoctor = async (req, res) => {
   try {
     const doctorId = req.params.id;
     const doctor = await Doctor.findById(doctorId);
-    if (!doctor) return res.status(404).send("doctor not found");
+    if (!doctor) return res.status(404).json({message:'doctor not found'});
     await doctor.deleteOne();
-    return res.status(200).send("doctor account was deleted successfully...");
+    return res.status(200).json({message:'doctor account was deleted successfully...'});
   } catch (error) {
     console.error(error);
   }
 }
 
-async function createAvailability(req, res) {
+const createAvailability = async (req, res) => {
   try {
     const { doctorId, slots } = req.body;
+
+    const doctorExists = await Doctor.findById(doctorId);
+    if (!doctorExists)  return res.status(404).json({ message: 'Doctor not found' });
+
     const newAvailability = new Availability({
       doctorId,
       slots
@@ -119,20 +123,17 @@ async function createAvailability(req, res) {
     });
   } catch (error) {
     console.error('Error creating availability:', error);
-    res.status(500).send('Internal Server Error');
   }
 }
-
-
-async function getAvailability(req, res) {
+const getAvailability = async (req, res) => {
   try {
-    const { doctorId } = req.params;
+    const  doctorId  = req.params.id;
+
+    const doctorExists = await Doctor.findById(doctorId);
+    if (!doctorExists)  return res.status(404).json({ message: 'Doctor not found' });
 
     const availability = await Availability.find({ doctorId });
-
-    if (!availability.length) {
-      return res.status(404).send("No availability found for this doctor");
-    }
+    if (!availability.length) return res.status(404).json({message:"No availability found for this doctor"});
 
     res.status(200).json({
       message: "Availability retrieved successfully",
@@ -140,15 +141,17 @@ async function getAvailability(req, res) {
     });
   } catch (error) {
     console.error('Error retrieving availability:', error);
-    res.status(500).send('Internal Server Error');
   }
 }
 
-
-async function updateAvailability(req, res) {
+const updateAvailability = async (req, res) => {
   try {
-    const { availabilityId } = req.params;
-    const updateFields = req.body;
+    const { availabilityId } = req.params.id;
+
+    const availability = await Availability.find({ doctorId });
+    if (!availability.length) return res.status(404).json({message:"No availability found for this doctor"});
+
+    const {updateFields} = req.body;
 
     const updatedAvailability = await Availability.findByIdAndUpdate(
       availabilityId,
@@ -156,9 +159,7 @@ async function updateAvailability(req, res) {
       { new: true }
     );
 
-    if (!updatedAvailability) {
-      return res.status(404).send("Availability not found");
-    }
+    if (!updatedAvailability) return res.status(404).json({message:"Availability not found"});
 
     res.status(200).json({
       message: "Availability updated successfully",
@@ -166,14 +167,17 @@ async function updateAvailability(req, res) {
     });
   } catch (error) {
     console.error('Error updating availability:', error);
-    res.status(500).send('Internal Server Error');
   }
 }
 
 
-async function getDoctorAppointments(req, res) {
+const getDoctorAppointments = async (req, res) => {
   try {
-    const doctorId = req.params.id;
+    const {doctorId} = req.params.id;
+
+    const doctorExists = await Doctor.findById(doctorId);
+    if (!doctorExists)  return res.status(404).json({ message: 'Doctor not found' });
+
 
     const appointments = await Appointment.find({ doctorId })
       .populate('patientId', 'name')
@@ -185,20 +189,23 @@ async function getDoctorAppointments(req, res) {
   }
 }
 
-async function updateAppointment(req, res) {
+const updateAppointment = async (req, res) => {
   try {
-    const { appointmentId } = req.params;
-    const {doctorId} = req.params.doctorId;
+    const { appointmentId, doctorId } = req.params;
     const { userId, status } = req.body;
+    
+    const doctorExists = await Doctor.findById(doctorId);
+    if (!doctorExists)  return res.status(404).json({ message: 'Doctor not found' });
+
+    const userExists = await User.findById(userId);
+    if (!userExists)   return res.status(404).json({ message: 'User not found' });
+
 
     const appointment = await Appointment.findById(appointmentId);
-    if (!appointment) {
-      return res.status(404).json({ message: 'Appointment not found' });
-    }
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    if (status !== 'ACCEPTED' && status !== 'REJECTED' && status!=='COMPLETED') {
-      return res.status(400).json({ message: 'Invalid status. Status must be ACCEPTED or CANCELED.' });
-    }
+
+    if (status !== 'ACCEPTED' && status !== 'REJECTED' && status !== 'COMPLETED') return res.status(400).json({ message: 'Invalid status. Status must be ACCEPTED or CANCELED.' });
 
     appointment.status = status;
     await appointment.save();
@@ -216,9 +223,7 @@ async function updateAppointment(req, res) {
       { new: true }
     );
 
-    if (!updatedDoctor) {
-      return res.status(404).json({ message: 'Doctor or appointment not found in userAppointments' });
-    }
+    if (!updatedDoctor) return res.status(404).json({ message: 'Doctor or appointment not found in userAppointments' });
 
     const updatedUser = await User.findOneAndUpdate(
       {
@@ -233,25 +238,12 @@ async function updateAppointment(req, res) {
       { new: true }
     );
 
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'User or appointment not found in appointments' });
-    }
-
-    const doctorExists = await Doctor.findById(doctorId);
-    if (!doctorExists) {
-      return res.status(404).json({ message: 'Doctor not found' });
-    }
-
-    const userExists = await User.findById(userId);
-    if (!userExists) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (!updatedUser) return res.status(404).json({ message: 'User or appointment not found in appointments' });
 
     await updateEmail(userExists.email, doctorExists.name, userExists.name, appointment.day, appointment.date, appointment.time, appointment.reason, appointment.status)
     res.status(200).json({ message: `Appointment updated successfully`, appointment });
   } catch (error) {
     console.error('Error updating appointment status:', error);
-    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
